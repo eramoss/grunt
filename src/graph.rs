@@ -1,20 +1,21 @@
-#[cfg(feature = "csr")]
-use crate::csr::CSR;
-
 use nalgebra::DMatrix;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Graph {
     pub vertices: Vec<u32>,
     pub edges: Vec<(u32, u32)>,
     pub adjacency: HashMap<u32, Vec<u32>>,
-
-    #[cfg(feature = "csr")]
-    pub csr: CSR,
 }
 
 impl Graph {
+    pub fn new() -> Self {
+        Self {
+            vertices: Vec::new(),
+            edges: Vec::new(),
+            adjacency: HashMap::new(),
+        }
+    }
     pub fn from_edges(vertices: Vec<u32>, edges: Vec<(u32, u32)>) -> Self {
         let mut adjacency: HashMap<u32, Vec<u32>> =
             vertices.iter().map(|&v| (v, Vec::new())).collect();
@@ -27,13 +28,47 @@ impl Graph {
             vertices: vertices.clone(),
             edges: edges.clone(),
             adjacency,
-
-            #[cfg(feature = "csr")]
-            csr: CSR::from_edges(vertices.len(), edges.as_slice()),
         }
     }
 
-    pub fn adjency_matrix(self) -> DMatrix<u32> {
+    pub fn add_vertex(&mut self, v: u32) -> bool {
+        if self.vertices.contains(&v) {
+            return false;
+        }
+        self.vertices.push(v);
+        self.adjacency.insert(v, Vec::new());
+        true
+    }
+
+    pub fn add_edge(&mut self, u: u32, v: u32) -> bool {
+        if !self.vertices.contains(&u) || !self.vertices.contains(&v) {
+            return false;
+        }
+        if self.edges.contains(&(u, v)) {
+            return false;
+        }
+        self.edges.push((u, v));
+        self.adjacency.entry(u).or_default().push(v);
+
+        true
+    }
+
+    pub fn undirected(&self) -> Graph {
+        let edges_to_add: Vec<(u32, u32)> = self
+            .edges
+            .iter()
+            .filter(|&&(u, v)| u != v && !self.edges.contains(&(v, u)))
+            .map(|&(u, v)| (v, u))
+            .collect();
+
+        let mut ng = self.clone();
+        for (u, v) in edges_to_add {
+            ng.add_edge(u, v);
+        }
+        ng
+    }
+
+    pub fn adjacency_matrix(&self) -> DMatrix<u32> {
         let n = self.vertices.len();
         let mut m = DMatrix::zeros(n, n);
 
@@ -50,5 +85,105 @@ impl Graph {
 
     pub fn neighbors(&self, v: u32) -> &[u32] {
         self.adjacency.get(&v).map(|s| s.as_slice()).unwrap_or(&[])
+    }
+
+    pub fn bfs(&self, s: u32) -> Vec<u32> {
+        let mut f = VecDeque::new();
+        let mut x = HashSet::new();
+        let mut o = Vec::new();
+
+        f.push_back(s);
+        x.insert(s);
+
+        while let Some(v) = f.pop_front() {
+            o.push(v);
+            for &n in self.neighbors(v) {
+                if x.insert(n) {
+                    f.push_back(n);
+                }
+            }
+        }
+
+        o
+    }
+
+    pub fn dfs(&self, s: u32) -> Vec<u32> {
+        let mut f = Vec::new();
+        let mut x = HashSet::new();
+        let mut o = Vec::new();
+
+        f.push(s);
+        x.insert(s);
+
+        while let Some(v) = f.pop() {
+            o.push(v);
+            for &n in self.neighbors(v) {
+                if x.insert(n) {
+                    f.push(n);
+                }
+            }
+        }
+        o
+    }
+
+    pub fn transitive_closure_direct(&self, v: u32) -> Vec<u32> {
+        let tc = self.mmb();
+        let row = self
+            .vertices
+            .iter()
+            .position(|&x| x == v)
+            .expect("Vertex not in graph");
+        self.vertices
+            .iter()
+            .enumerate()
+            .filter(|&(j, _)| tc[(row, j)] > 0)
+            .map(|(_, &u)| u)
+            .collect()
+    }
+
+    pub fn transitive_closure_indirect(&self, v: u32) -> Vec<u32> {
+        let tc = self.mmb();
+        let col = self
+            .vertices
+            .iter()
+            .position(|&x| x == v)
+            .expect("Vertex not in graph");
+        self.vertices
+            .iter()
+            .enumerate()
+            .filter(|&(i, _)| tc[(i, col)] > 0)
+            .map(|(_, &u)| u)
+            .collect()
+    }
+
+    // https://jn.inf.ethz.ch/education/script/P3_C11.pdf
+    // probably the same as marshall? the implementation is the same but didnt see any direct
+    // mention
+    //
+    //Let A, B, C be n × n boolean matrices defined by
+    //type nnboolean: array[1 .. n, 1 .. n] of boolean;
+    //var A, B, C: nnboolean;
+    //The boolean matrix multiplication C = A · B is defined as
+    //C[i, j] = OR _from k 1 to n_ (A[i, k] and B[k, j])
+    //but since we're trying to power here to define rechables A and B are the adjacency_matrix
+    fn mmb(&self) -> DMatrix<u32> {
+        let n = self.vertices.len();
+        let mut tc = self.adjacency_matrix();
+        for k in 0..n {
+            for i in 0..n {
+                for j in 0..n {
+                    if tc[(i, k)] > 0 && tc[(k, j)] > 0 {
+                        tc[(i, j)] = 1;
+                    }
+                }
+            }
+        }
+        tc
+    }
+}
+
+impl Default for Graph {
+    fn default() -> Self {
+        Self::new()
     }
 }

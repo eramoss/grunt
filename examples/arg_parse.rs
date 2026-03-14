@@ -43,7 +43,7 @@ fn parse_graph(s: &str) -> Result<Graph, String> {
 
 fn main() {
     let args = Args::parse();
-    let graph = parse_graph(&args.config);
+    let graph = parse_graph(&args.config).unwrap();
 
-    dbg!(graph.unwrap());
+    print!("{:#?}", graph.bfs(0));
 }
