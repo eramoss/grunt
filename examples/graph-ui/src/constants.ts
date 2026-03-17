@@ -5,7 +5,6 @@ export const ARROW  = 11;
 export const CX = 400;
 export const CY = 300;
 
-// Classic print/paper SCC colors — muted, ink-on-paper annotations
 export const SCC_PALETTE = [
   { fill: "#fffbeb", stroke: "#b45309", text: "#92400e", cls: "scc0" },
   { fill: "#f0fdf4", stroke: "#15803d", text: "#14532d", cls: "scc1" },

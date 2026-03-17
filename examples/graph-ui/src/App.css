@@ -1,5 +1,3 @@
-/* ── Old-school scientific paper aesthetic ────────────────── */
-/* Think: LaTeX figures, gnuplot, 1990s academic software     */
 @import url('https://fonts.googleapis.com/css2?family=IM+Fell+English&family=Courier+Prime:wght@400;700&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -19,10 +17,9 @@
   --green:      #1a5c1a;
 
   font-family: 'Courier Prime', 'Courier New', Courier, monospace;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink);
   background: var(--paper);
-	zoom: 1.2;
 }
 
 html, body {
@@ -40,6 +37,9 @@ html, body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+.app-root > *:not(.canvas-area), .toolbar, .legend-panel, .scc-legend {
+  zoom: var(--ui-zoom, 1);
 }
 
 /* ── Old-style raised/sunken button effect ────────────────── */
@@ -172,7 +172,7 @@ html, body {
   overflow: hidden;
   background: var(--white);
   flex: 1;
-  min-height: 0;    /* critical: lets flex child shrink below content size */
+  min-height: 0;
   min-width: 0;
 }
 

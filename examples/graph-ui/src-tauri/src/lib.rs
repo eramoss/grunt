@@ -10,8 +10,6 @@ pub struct AppState {
 #[derive(Serialize, Clone)]
 pub struct GraphSnapshot {
     pub vertices: Vec<u32>,
-    /// Edges to display: for undirected graphs we deduplicate by only keeping
-    /// the first occurrence of each unordered pair.
     pub edges: Vec<[u32; 2]>,
     pub directed: bool,
 }
@@ -26,7 +24,6 @@ fn snapshot(g: &Graph) -> GraphSnapshot {
     let edges = if g.directed {
         g.edges.iter().map(|&(u, v)| [u, v]).collect()
     } else {
-        // edges contains both (u,v) and (v,u); keep only the first seen pair
         let mut seen = std::collections::HashSet::new();
         g.edges
             .iter()
@@ -160,52 +157,6 @@ fn check_connectivity(state: State<AppState>) -> ConnectivityResult {
     }
 }
 
-#[tauri::command]
-fn load_template(state: State<AppState>, template: String) -> GraphSnapshot {
-    let mut g = state.graph.lock().unwrap();
-    *g = Graph::new_undirected();
-
-    let n = match template.as_str() {
-        "triangle" => 3,
-        "square" => 4,
-        "star" => 6,
-        "complete" => 5,
-        _ => 5,
-    };
-
-    for i in 0..n {
-        g.add_vertex(i);
-    }
-
-    match template.as_str() {
-        "triangle" => {
-            g.add_edge(0, 1);
-            g.add_edge(1, 2);
-            g.add_edge(2, 0);
-        }
-        "square" => {
-            g.add_edge(0, 1);
-            g.add_edge(1, 2);
-            g.add_edge(2, 3);
-            g.add_edge(3, 0);
-        }
-        "star" => {
-            for i in 1..n {
-                g.add_edge(0, i);
-            }
-        }
-        "complete" => {
-            for i in 0..n {
-                for j in i + 1..n {
-                    g.add_edge(i, j);
-                }
-            }
-        }
-        _ => {}
-    }
-    snapshot(&g)
-}
-
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState {
@@ -224,7 +175,6 @@ pub fn run() {
             get_transitive_direct,
             get_transitive_indirect,
             check_connectivity,
-            load_template,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

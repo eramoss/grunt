@@ -18,3 +18,14 @@ export type AlgoResult =
 export interface Pos { x: number; y: number; }
 
 export interface Flash { kind: "err" | "ok"; msg: string; }
+
+export interface EdgeSelection {
+  src: number;
+  dst: number;
+}
+
+export interface GraphHistory {
+  vertices: number[];
+  edges: [number, number][];
+  directed: boolean;
+}
