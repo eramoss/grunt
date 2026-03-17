@@ -1,0 +1,283 @@
+/* ── Old-school scientific paper aesthetic ────────────────── */
+/* Think: LaTeX figures, gnuplot, 1990s academic software     */
+@import url('https://fonts.googleapis.com/css2?family=IM+Fell+English&family=Courier+Prime:wght@400;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+
+:root {
+  /* Paper white palette */
+  --paper:      #fafaf7;
+  --white:      #ffffff;
+  --rule:       #999;
+  --rule-light: #ccc;
+  --ink:        #111;
+  --ink-mid:    #444;
+  --ink-faint:  #888;
+  --accent:     #1a3a6b;   /* deep navy — classic scientific figure color */
+  --red:        #8b1a1a;
+  --green:      #1a5c1a;
+
+  font-family: 'Courier Prime', 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--paper);
+	zoom: 1.2;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Old-style raised/sunken button effect ────────────────── */
+.btn-raised {
+  background: #e8e8e0;
+  border-top:    1px solid #fff;
+  border-left:   1px solid #fff;
+  border-right:  1px solid #888;
+  border-bottom: 1px solid #888;
+  box-shadow: 1px 1px 0 #555;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  color: var(--ink);
+  white-space: nowrap;
+  user-select: none;
+  line-height: 1.4;
+}
+.btn-raised:active, .btn-raised.pressed {
+  border-top:    1px solid #888;
+  border-left:   1px solid #888;
+  border-right:  1px solid #fff;
+  border-bottom: 1px solid #fff;
+  box-shadow: none;
+  padding: 3px 7px 1px 9px;
+}
+.btn-raised:hover:not(:active) { background: #eeeeea; }
+.btn-raised.primary {
+  background: #d0dce8;
+  border-top-color: #e8f0f8;
+  border-left-color: #e8f0f8;
+  color: var(--accent);
+  font-weight: 700;
+}
+.btn-raised.danger { color: var(--red); }
+.btn-raised:disabled { opacity: 0.45; cursor: default; }
+
+/* ── Text input — old X11/Motif sunken field ──────────────── */
+.field-sunken {
+  background: #fff;
+  border-top:    1px solid #777;
+  border-left:   1px solid #777;
+  border-right:  1px solid #ddd;
+  border-bottom: 1px solid #ddd;
+  font-family: 'Courier Prime', monospace;
+  font-size: 11px;
+  padding: 1px 4px;
+  color: var(--ink);
+  outline: none;
+  width: 52px;
+  -moz-appearance: textfield;
+}
+.field-sunken::-webkit-outer-spin-button,
+.field-sunken::-webkit-inner-spin-button { -webkit-appearance: none; }
+.field-sunken:focus {
+  border-top-color: var(--accent);
+  border-left-color: var(--accent);
+}
+
+/* ── Toggle pair — radio-button style ────────────────────── */
+.toggle-pair {
+  display: flex;
+  border: 1px solid #999;
+}
+.toggle-pair button {
+  font-family: inherit;
+  font-size: 10px;
+  padding: 2px 7px;
+  background: #e8e8e0;
+  border: none;
+  border-right: 1px solid #999;
+  color: var(--ink-mid);
+  cursor: pointer;
+  line-height: 1.4;
+}
+.toggle-pair button:last-child { border-right: none; }
+.toggle-pair button.on {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ── Toolbar — classic menubar style ─────────────────────── */
+.toolbar {
+  display: flex;
+	flex-wrap: wrap;
+  align-items: start;
+	gap: 5px;
+  background: #e0e0d8;
+  border-bottom: 1px solid #999;
+  padding: 3px 4px;
+  min-height: 32px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.toolbar::-webkit-scrollbar { display: none; }
+
+.tb-sep {
+  width: 1px;
+  height: 18px;
+  background: #999;
+  margin: 0 5px;
+  flex-shrink: 0;
+}
+
+.tb-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 3px;
+  flex-shrink: 0;
+}
+
+.tb-label {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #666;
+  font-weight: 700;
+  margin-right: 1px;
+  user-select: none;
+}
+
+/* ── Canvas area ──────────────────────────────────────────── */
+.canvas-area {
+  position: relative;
+  overflow: hidden;
+  background: var(--white);
+  flex: 1;
+  min-height: 0;    /* critical: lets flex child shrink below content size */
+  min-width: 0;
+}
+
+/* ── Order banner — like a figure caption strip ───────────── */
+.order-banner {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: #f5f5ee;
+  border-bottom: 1px solid #bbb;
+  font-size: 11px;
+  animation: slideDown 0.12s ease-out;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.order-banner::-webkit-scrollbar { display: none; }
+
+/* ── SCC Legend — floating resizable panel ────────────────── */
+.scc-legend {
+  position: absolute;
+  bottom: 0px;
+  z-index: 10;
+  width: 100%;
+  height: 260px;        /* default height — user can resize */
+  min-width: 180px;
+  min-height: 120px;
+  resize: both;         /* browser native resize handle (bottom-right corner) */
+  overflow: hidden;     /* required for resize to work */
+  display: flex;
+  flex-direction: column;
+  background: #fafaf7;
+  border: 1px solid #999;
+  box-shadow: 2px 2px 0 #bbb;
+  font-size: 11px;
+  animation: fadeUp 0.12s ease-out;
+}
+
+.scc-legend-items {
+  padding: 4px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;        /* lets flex child shrink and scroll */
+}
+
+/* ── Status badges ────────────────────────────────────────── */
+.status-ok  { color: var(--green); font-weight: 700; }
+.status-err { color: var(--red);   font-weight: 700; }
+
+/* ── Flash message ────────────────────────────────────────── */
+.flash {
+  font-size: 10px;
+  padding: 1px 6px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.flash.ok  { color: var(--green); border-color: var(--green); background: #f0fff0; }
+.flash.err { color: var(--red);   border-color: var(--red);   background: #fff0f0; }
+
+/* ── SVG canvas ───────────────────────────────────────────── */
+.canvas-area svg { user-select: none; }
+
+/* ── Dropdown ─────────────────────────────────────────────── */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 1px;
+  z-index: 50;
+  background: #e8e8e0;
+  border: 1px solid #999;
+  box-shadow: 2px 2px 0 #aaa;
+  min-width: 180px;
+}
+.dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 3px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.dropdown-item:hover { background: var(--accent); color: #fff; }
+
+/* ── Keyframes ────────────────────────────────────────────── */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Node / edge transitions ──────────────────────────────── */
+circle { transition: fill 0.1s, stroke 0.1s; }
