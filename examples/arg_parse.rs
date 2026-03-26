@@ -38,7 +38,7 @@ fn parse_graph(s: &str) -> Result<Graph, String> {
         edges.push((nodes[0], nodes[1]));
     }
 
-    Ok(Graph::from_edges(vertices, edges))
+    Ok(Graph::from_edges(false, vertices, edges))
 }
 
 fn main() {

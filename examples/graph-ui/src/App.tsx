@@ -20,6 +20,8 @@ const HELP_ITEMS = [
 	{ key: "redo", label: "Ctrl+Y", description: "Redo" },
 	{ key: "pan", label: "Left-drag canvas", description: "Pan view" },
 	{ key: "move", label: "Drag node", description: "Move node" },
+	{ key: "canvas-zoom", label: "Ctrl+Plus/Minus", description: "Zoom canvas" },
+	{ key: "ui-zoom", label: "Ctrl+Alt+Plus/Minus", description: "Zoom UI" },
 ];
 
 export default function App() {
@@ -181,6 +183,16 @@ export default function App() {
 			if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); undo(); }
 			if ((e.ctrlKey || e.metaKey) && e.key === "y") { e.preventDefault(); redo(); }
 			if ((e.ctrlKey || e.metaKey) && e.key === "h") { e.preventDefault(); setShowHelp(x => !x); }
+			if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "+" || e.key === "=" || e.key === "-")) {
+				e.preventDefault();
+				const factor = e.key === "+" || e.key === "=" ? 1.12 : 1 / 1.12;
+				setScale(s => Math.max(0.15, Math.min(8, s * factor)));
+			}
+			if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === "+" || e.key === "=" || e.key === "-")) {
+				e.preventDefault();
+				const delta = e.key === "+" || e.key === "=" ? 0.1 : -0.1;
+				setUiZoom(z => Math.max(0.5, Math.min(3, +(z + delta).toFixed(2))));
+			}
 		};
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
@@ -215,8 +227,13 @@ export default function App() {
 		const el = canvasRef.current;
 		if (!el) return;
 		const onWheel = (e: WheelEvent) => {
-			e.preventDefault();
 			const rect = el.getBoundingClientRect();
+			const isOverCanvas = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+			if (!isOverCanvas) return;
+			const target = e.target as HTMLElement;
+			const isOverlay = target.closest(".order-banner, .scc-legend, .legend-panel, .dropdown-menu");
+			if (isOverlay) return;
+			e.preventDefault();
 			const mouseX = e.clientX - rect.left;
 			const mouseY = e.clientY - rect.top;
 			const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
@@ -409,7 +426,7 @@ export default function App() {
 		<div
 		className="app-root"
 		style={{
-			"--ui-zoom": uiZoom,
+			"--ui-scale": uiZoom,
 			display: "flex",
 			flexDirection: "column",
 			height: "100dvh",
@@ -440,8 +457,8 @@ export default function App() {
 		onToggleHelp={() => setShowHelp(x => !x)}
 		selected={selectedNode}
 		selectedEdge={selectedEdge}
-  uiZoom={uiZoom}
-  setUiZoom={setUiZoom}
+		uiZoom={uiZoom}
+		setUiZoom={setUiZoom}
 		/>
 
 		<div className="canvas-area" ref={canvasRef}>

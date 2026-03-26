@@ -147,7 +147,6 @@ impl Graph {
                 }
             }
         }
-
         o
     }
 
@@ -201,7 +200,7 @@ impl Graph {
     }
 
     // https://jn.inf.ethz.ch/education/script/P3_C11.pdf
-    // probably the same as marshall? the implementation is the same but didnt see any direct
+    // probably the same as warshall? the implementation is the same but didnt see any direct
     // mention
     //
     //Let A, B, C be n x n boolean matrices defined by
@@ -210,8 +209,6 @@ impl Graph {
     //The boolean matrix multiplication C = A . B is defined as
     //C[i, j] = OR _from k 1 to n_ (A[i, k] and B[k, j])
     //but since we're trying to power here to define rechables A and B are the adjacency_matrix
-    //now im thinking about just multiplying the mutrix by iself and consider x>0 = true?; make
-    //sense i think
     fn mmb(&self) -> DMatrix<u32> {
         let n = self.vertices.len();
         let mut tc = self.adjacency_matrix();
@@ -227,9 +224,6 @@ impl Graph {
         tc
     }
 
-    // A graph is connected if a bfs from any vertex visits every vertex.
-    // For directed graphs i check weak connectivity by running on the
-    // undirected .
     pub fn is_connected(&self) -> bool {
         if self.vertices.is_empty() {
             return true;
@@ -237,8 +231,6 @@ impl Graph {
         self.undirected().bfs(self.vertices[0]).len() == self.vertices.len()
     }
 
-    // Connected components via repeated bfs on the undirected graph.
-    // For directed graphs these are the weakly connected components.
     pub fn connected_components(&self) -> Vec<Vec<u32>> {
         let ug = self.undirected();
         let mut visited: HashSet<u32> = HashSet::new();
@@ -257,11 +249,6 @@ impl Graph {
         components
     }
 
-    // strongly connected components (scc) for directed graphs.
-    // Two vertices belong to the same scc when each can reach the other.
-    // Detect this with bfs: u is in the scc of v when bfs(v) contains u
-    // and bfs(u) contains v.
-    // probably in future use Kosaraju's algorithm?? idk never usedit :)
     pub fn strongly_connected_components(&self) -> Vec<Vec<u32>> {
         if !self.directed {
             return self.connected_components();
