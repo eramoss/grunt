@@ -1,6 +1,6 @@
 use grunt::graph::Graph;
 use serde::Serialize;
-use std::sync::Mutex;
+use std::{collections::HashMap, sync::Mutex};
 use tauri::State;
 
 pub struct AppState {
@@ -18,6 +18,13 @@ pub struct GraphSnapshot {
 pub struct ConnectivityResult {
     pub is_connected: bool,
     pub components: Vec<Vec<u32>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ColoringResult {
+    pub coloring: HashMap<u32, usize>,
+    pub num_colors: usize,
+    pub color_classes: Vec<Vec<u32>>,
 }
 
 fn snapshot(g: &Graph) -> GraphSnapshot {
@@ -157,6 +164,25 @@ fn check_connectivity(state: State<AppState>) -> ConnectivityResult {
     }
 }
 
+#[tauri::command]
+fn run_coloring(state: tauri::State<AppState>) -> ColoringResult {
+    let coloring = state.graph.lock().unwrap().color();
+    let num_colors = coloring.values().max().map(|&m| m + 1).unwrap_or(0);
+
+    let mut color_classes: Vec<Vec<u32>> = vec![vec![]; num_colors];
+    for (&v, &c) in &coloring {
+        color_classes[c].push(v);
+    }
+    for class in &mut color_classes {
+        class.sort_unstable();
+    }
+    ColoringResult {
+        coloring,
+        num_colors,
+        color_classes,
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState {
@@ -175,6 +201,7 @@ pub fn run() {
             get_transitive_direct,
             get_transitive_indirect,
             check_connectivity,
+            run_coloring,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-import type { GraphSnapshot, ConnectivityResult, AlgoResult, Pos, Flash, EdgeSelection, GraphHistory } from "./types";
+import type { GraphSnapshot, ConnectivityResult, ColoringResult, AlgoResult, Pos, Flash, EdgeSelection, GraphHistory } from "./types";
 import { CX, CY, circlePos } from "./constants";
 import { TEMPLATES } from "./templates";
 import Toolbar from "./components/Toolbar";
 import Canvas from "./components/Canvas";
 import OrderBanner from "./components/OrderBanner";
 import SccLegend from "./components/SccLegend";
+import ColorLegend from "./components/ColorLegend";
 import LegendPanel from "./components/LegendPanel";
 
 const MAX_HISTORY = 50;
@@ -161,10 +162,10 @@ export default function App() {
 
 	const withGraph = async (cmd: string, args: Record<string, unknown> = {}, save = true) => {
 		const snap = await call<GraphSnapshot>(cmd, args);
-		if (snap) { 
+		if (snap) {
 			if (save) saveToHistory(snap);
-			applyGraph(snap); 
-			showFlash("ok", cmd.replace(/_/g, " ")); 
+			applyGraph(snap);
+			showFlash("ok", cmd.replace(/_/g, " "));
 		}
 	};
 
@@ -231,7 +232,7 @@ export default function App() {
 			const isOverCanvas = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
 			if (!isOverCanvas) return;
 			const target = e.target as HTMLElement;
-			const isOverlay = target.closest(".order-banner, .scc-legend, .legend-panel, .dropdown-menu");
+			const isOverlay = target.closest(".order-banner, .scc-legend, .legend-panel, .color-legend, .dropdown-menu");
 			if (isOverlay) return;
 			e.preventDefault();
 			const mouseX = e.clientX - rect.left;
@@ -251,7 +252,7 @@ export default function App() {
 	const runAlgo = async (cmd: string, label: string, parseVertex = true) => {
 		const v = parseInt(algoV);
 		if (parseVertex && isNaN(v)) { showFlash("err", "specify vertex"); return; }
-		const data = await call<number[] | ConnectivityResult>(cmd, parseVertex ? { start: v } : {v});
+		const data = await call<number[] | ConnectivityResult>(cmd, parseVertex ? { start: v } : { v });
 		if (!data) return;
 		if (Array.isArray(data)) {
 			setResult({ kind: "traversal", label, order: data });
@@ -263,6 +264,18 @@ export default function App() {
 			setSccMap(map);
 			setHighlighted(new Set());
 		}
+	};
+
+	const handleColoring = async () => {
+		const data = await call<ColoringResult>("run_coloring");
+		if (!data) return;
+		setResult({ kind: "coloring", data });
+		// Reuse sccMap: vertex → color index so Canvas renders palette colors automatically
+		const map = new Map<number, number>();
+		data.color_classes.forEach((cls, idx) => cls.forEach(v => map.set(v, idx)));
+		setSccMap(map);
+		setHighlighted(new Set());
+		showFlash("ok", `coloring — χ ≤ ${data.num_colors}`);
 	};
 
 	const handleAddVertex = async () => {
@@ -298,13 +311,13 @@ export default function App() {
 
 	const handleReset = async () => {
 		const snap = await call<GraphSnapshot>("reset_graph");
-		if (snap) { 
+		if (snap) {
 			history.current = [];
 			historyIndex.current = -1;
 			saveToHistory(snap);
-			applyGraph(snap); 
-			setPositions(new Map()); 
-			setEdgeSrc(null); 
+			applyGraph(snap);
+			setPositions(new Map());
+			setEdgeSrc(null);
 			setCanUndo(false);
 			setCanRedo(false);
 		}
@@ -351,8 +364,8 @@ export default function App() {
 				setEFrom(String(u));
 				setETo(String(v));
 				invoke<GraphSnapshot>("add_edge", { u, v })
-				.then(snap => { if (snap) { saveToHistory(snap); applyGraph(snap); showFlash("ok", `edge (${u}, ${v})`); } })
-				.catch(err => showFlash("err", String(err)));
+					.then(snap => { if (snap) { saveToHistory(snap); applyGraph(snap); showFlash("ok", `edge (${u}, ${v})`); } })
+					.catch(err => showFlash("err", String(err)));
 			}
 			return;
 		}
@@ -389,23 +402,23 @@ export default function App() {
 			const y = (e.clientY - rect.top - panRef.current.y) / scaleRef.current;
 			const nextId = getNextId();
 			invoke<GraphSnapshot>("add_vertex", { v: nextId })
-			.then(snap => {
-				if (snap) { 
-					saveToHistory(snap); 
-					setGraph(snap);
-					setPositions(prev => {
-						const next = new Map(prev);
-						snap.vertices.forEach((v, i) => {
-							if (!next.has(v)) next.set(v, v === nextId ? { x, y } : circlePos(i, snap.vertices.length, CX, CY, 180));
+				.then(snap => {
+					if (snap) {
+						saveToHistory(snap);
+						setGraph(snap);
+						setPositions(prev => {
+							const next = new Map(prev);
+							snap.vertices.forEach((v, i) => {
+								if (!next.has(v)) next.set(v, v === nextId ? { x, y } : circlePos(i, snap.vertices.length, CX, CY, 180));
+							});
+							for (const k of next.keys())
+								if (!snap.vertices.includes(k)) next.delete(k);
+							return next;
 						});
-						for (const k of next.keys())
-							if (!snap.vertices.includes(k)) next.delete(k);
-						return next;
-					});
-					showFlash("ok", `node ${nextId}`); 
-				}
-			})
-			.catch(err => showFlash("err", String(err)));
+						showFlash("ok", `node ${nextId}`);
+					}
+				})
+				.catch(err => showFlash("err", String(err)));
 		}
 	};
 
@@ -421,81 +434,84 @@ export default function App() {
 	const orderLabel = result?.kind === "traversal" ? result.label : result?.kind === "closure" ? result.label : "";
 	const orderItems = result?.kind === "traversal" ? result.order.map((v, i) => ({ v, idx: i + 1 })) : result?.kind === "closure" ? result.vertices.map(v => ({ v })) : [];
 	const connData = result?.kind === "connectivity" ? result.data : null;
+	const colorData = result?.kind === "coloring" ? result.data : null;
 
 	return (
 		<div
-		className="app-root"
-		style={{
-			"--ui-scale": uiZoom,
-			display: "flex",
-			flexDirection: "column",
-			height: "100dvh",
-			width: "100%",
-			overflow: "hidden",
-			background: "#fafaf7",
-		} as React.CSSProperties}
+			className="app-root"
+			style={{
+				"--ui-scale": uiZoom,
+				display: "flex",
+				flexDirection: "column",
+				height: "100dvh",
+				width: "100%",
+				overflow: "hidden",
+				background: "#fafaf7",
+			} as React.CSSProperties}
 		>
-		<Toolbar
-		graph={graph} flash={flash} hasResult={result !== null}
-		vInput={vInput} setVInput={setVInput}
-		eFrom={eFrom} setEFrom={setEFrom}
-		eTo={eTo} setETo={setETo}
-		algoV={algoV} setAlgoV={setAlgoV}
-		showTemplateMenu={showTemplateMenu}
-		onToggleTemplateMenu={() => setShowTemplateMenu(x => !x)}
-		onAddVertex={handleAddVertex} onRemoveVertex={handleRemoveVertex}
-		onAddEdge={handleAddEdge} onRemoveEdge={handleRemoveEdge}
-		onSetDirected={handleSetDirected} onReset={handleReset}
-		onBfs={() => runAlgo("run_bfs", `BFS from ${algoV}`)}
-		onDfs={() => runAlgo("run_dfs", `DFS from ${algoV}`)}
-		onClosureDirect={() => runAlgo("get_transitive_direct", `TC+(${algoV})`, false)}
-		onClosureIndirect={() => runAlgo("get_transitive_indirect", `TC-(${algoV})`, false)}
-		onConnectivity={() => runAlgo("check_connectivity", "Connectivity")}
-		onClearResult={clearResult}
-		onLoadTemplate={loadTemplate}
-		canUndo={canUndo} canRedo={canRedo} onUndo={undo} onRedo={redo}
-		onToggleHelp={() => setShowHelp(x => !x)}
-		selected={selectedNode}
-		selectedEdge={selectedEdge}
-		uiZoom={uiZoom}
-		setUiZoom={setUiZoom}
-		/>
+			<Toolbar
+				graph={graph} flash={flash} hasResult={result !== null}
+				vInput={vInput} setVInput={setVInput}
+				eFrom={eFrom} setEFrom={setEFrom}
+				eTo={eTo} setETo={setETo}
+				algoV={algoV} setAlgoV={setAlgoV}
+				showTemplateMenu={showTemplateMenu}
+				onToggleTemplateMenu={() => setShowTemplateMenu(x => !x)}
+				onAddVertex={handleAddVertex} onRemoveVertex={handleRemoveVertex}
+				onAddEdge={handleAddEdge} onRemoveEdge={handleRemoveEdge}
+				onSetDirected={handleSetDirected} onReset={handleReset}
+				onBfs={() => runAlgo("run_bfs", `BFS from ${algoV}`)}
+				onDfs={() => runAlgo("run_dfs", `DFS from ${algoV}`)}
+				onClosureDirect={() => runAlgo("get_transitive_direct", `TC+(${algoV})`, false)}
+				onClosureIndirect={() => runAlgo("get_transitive_indirect", `TC-(${algoV})`, false)}
+				onConnectivity={() => runAlgo("check_connectivity", "Connectivity")}
+				onColor={handleColoring}
+				onClearResult={clearResult}
+				onLoadTemplate={loadTemplate}
+				canUndo={canUndo} canRedo={canRedo} onUndo={undo} onRedo={redo}
+				onToggleHelp={() => setShowHelp(x => !x)}
+				selected={selectedNode}
+				selectedEdge={selectedEdge}
+				uiZoom={uiZoom}
+				setUiZoom={setUiZoom}
+			/>
 
-		<div className="canvas-area" ref={canvasRef}>
-		{showBanner && <OrderBanner label={orderLabel} items={orderItems} onClose={clearResult} />}
+			<div className="canvas-area" ref={canvasRef}>
+				{showBanner && <OrderBanner label={orderLabel} items={orderItems} onClose={clearResult} />}
 
-		{edgeSrc !== null && (
-			<div style={{ position: "absolute", top: showBanner ? 33 : 0, left: 0, right: 0, zIndex: 9, background: "#fffbeb", borderBottom: "1px solid #d97706", padding: "2px 10px", fontSize: 10, color: "#92400e", fontFamily: "monospace" }}>
-			Edge source: <strong>{edgeSrc}</strong> — Ctrl+click destination to add edge
+				{edgeSrc !== null && (
+					<div style={{ position: "absolute", top: showBanner ? 33 : 0, left: 0, right: 0, zIndex: 9, background: "#fffbeb", borderBottom: "1px solid #d97706", padding: "2px 10px", fontSize: 10, color: "#92400e", fontFamily: "monospace" }}>
+						Edge source: <strong>{edgeSrc}</strong> — Ctrl+click destination to add edge
+					</div>
+				)}
+
+				<Canvas
+					graph={graph}
+					positions={positions}
+					highlighted={highlighted}
+					sccMap={sccMap}
+					selected={selectedNode}
+					selectedEdge={selectedEdge}
+					edgeSrc={edgeSrc}
+					pan={pan}
+					scale={scale}
+					svgRef={svgRef}
+					onNodeClick={handleNodeClick}
+					onEdgeClick={handleEdgeClick}
+					onCanvasRightClick={handleCanvasRightClick}
+					onCanvasLeftDown={handleCanvasLeftDown}
+				/>
+
+				{graph.vertices.length === 0 && (
+					<div style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", fontFamily: "'IM Fell English', Georgia, serif", fontSize: 12, fontStyle: "italic", color: "#999", background: "rgba(255,255,255,0.85)", border: "1px solid #ddd", padding: "3px 14px" }}>
+						Add vertices using the toolbar, or load a template
+					</div>
+				)}
+
+				{connData && <SccLegend data={connData} directed={graph.directed} onClose={clearResult} />}
+				{colorData && <ColorLegend data={colorData} onClose={clearResult} />}
+				{showHelp && <LegendPanel title="Shortcuts" items={HELP_ITEMS} onClose={() => setShowHelp(false)} />}
 			</div>
-		)}
-
-		<Canvas
-		graph={graph}
-		positions={positions}
-		highlighted={highlighted}
-		sccMap={sccMap}
-		selected={selectedNode}
-		selectedEdge={selectedEdge}
-		edgeSrc={edgeSrc}
-		pan={pan}
-		scale={scale}
-		svgRef={svgRef}
-		onNodeClick={handleNodeClick}
-		onEdgeClick={handleEdgeClick}
-		onCanvasRightClick={handleCanvasRightClick}
-		onCanvasLeftDown={handleCanvasLeftDown}
-		/>
-
-		{graph.vertices.length === 0 && (
-			<div style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", fontFamily: "'IM Fell English', Georgia, serif", fontSize: 12, fontStyle: "italic", color: "#999", background: "rgba(255,255,255,0.85)", border: "1px solid #ddd", padding: "3px 14px" }}>
-			Add vertices using the toolbar, or load a template
-			</div>
-		)}
-
-		{connData && <SccLegend data={connData} directed={graph.directed} onClose={clearResult} />}
-		{showHelp && <LegendPanel title="Shortcuts" items={HELP_ITEMS} onClose={() => setShowHelp(false)} />}
-		</div>
 		</div>
 	);
 }

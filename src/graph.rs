@@ -275,6 +275,90 @@ impl Graph {
         }
         sccs
     }
+
+    // Heuristic:
+    // Init (first vertice):
+    //  Choose the most connected vertice
+    //
+    // 2nd Step:
+    //  Choose to color the vertice, within the moment, is adjacent for colored vertices with the
+    //  greatest saturation order
+    //  repeat.
+    //
+    //> Notes:
+    //>  In dispute cases, we select the most connected _or_ the first listed.
+    //>  The colors are numered, always choose the minor possible.
+    pub fn color(&self) -> HashMap<u32, usize> {
+        if self.vertices.is_empty() {
+            return HashMap::new();
+        }
+
+        // doesnt matter if it is directed or not in that case?
+        let ug = if self.directed {
+            self.undirected()
+        } else {
+            self.clone()
+        };
+
+        let degree: HashMap<u32, usize> = self
+            .vertices
+            .iter()
+            .map(|&v| (v, ug.neighbors(v).len()))
+            .collect();
+
+        let mut coloring: HashMap<u32, usize> = HashMap::new();
+
+        // saturation[v] = set of distinct colors that v sees
+        let mut saturation: HashMap<u32, HashSet<usize>> =
+            self.vertices.iter().map(|&v| (v, HashSet::new())).collect();
+
+        let mut uncolored: Vec<u32> = self.vertices.clone();
+
+        // Init
+        let first_idx = uncolored
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, v)| degree[&v])
+            .map(|(i, _)| i)
+            .unwrap();
+        let first = uncolored.remove(first_idx);
+
+        coloring.insert(first, 0);
+        for &nb in ug.neighbors(first) {
+            saturation.entry(nb).or_default().insert(0);
+        }
+
+        while !uncolored.is_empty() {
+            // 2nd step
+            let next_idx = uncolored
+                .iter()
+                .enumerate()
+                .max_by_key(|(_, v)| (saturation[v].len(), degree[v]))
+                // greatest saturation or degree on disputes (fallback to first encountered)
+                .map(|(i, _)| i)
+                .unwrap();
+            let next = uncolored.remove(next_idx);
+
+            let neighbor_colors: HashSet<usize> = ug
+                .neighbors(next)
+                .iter()
+                .filter_map(|nb| coloring.get(nb))
+                .cloned()
+                .collect();
+
+            let color = (0..).find(|c| !neighbor_colors.contains(c)).unwrap(); // minimum color possible
+            coloring.insert(next, color);
+
+            for &nb in ug.neighbors(next) {
+                // i just care about uncolereds at that point
+                if !coloring.contains_key(&nb) {
+                    saturation.entry(nb).or_default().insert(color);
+                }
+            }
+        }
+
+        coloring
+    }
 }
 
 impl Default for Graph {
